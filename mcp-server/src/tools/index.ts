@@ -43,7 +43,7 @@ async function findDayFile(date: string): Promise<string | null> {
 export function registerTools(server: McpServer): void {
   server.tool(
     "get_current_state",
-    "读取当前剧情状态: 好感度数值 + 最近发生的事件 + 当前停在哪。每次写新场景前必调用。",
+    "读取当前剧情状态: 好感度数值 + 最近发生的事件 + 当前停在哪。每次写新场景前必调用。⚠️ 重要：本工具返回的是当前状态快照(数值+近期事件标题/索引)·不是完整剧情。涉及具体过往细节(台词·动作·在场·情绪)·必须在调用后用 read_day 读对应 day 文件原文·不得仅凭本工具返回的摘要写作。",
     {},
     async () => {
       const affinity = await tryReadFile("memory/affinity.md");
@@ -171,7 +171,7 @@ export function registerTools(server: McpServer): void {
 
   server.tool(
     "make_context_pack",
-    "为本轮场景续写生成上下文包·自动读取必读文件 + 指定角色档案 + 指定 day 文件。每次写新场景的第一步调用此工具。",
+    "为本轮场景续写生成上下文包·自动读取必读文件 + 指定角色档案 + 指定 day 文件。每次写新场景的第一步调用此工具。⚠️ 重要：本工具返回的是上下文骨架(必读+档案摘要+索引)·不是完整剧情。涉及具体过往细节(台词·动作·在场·情绪)·必须在调用后用 read_day 读对应 day 文件原文·不得仅凭本工具返回的摘要写作。未找到项必须用 read_file 主动补读。",
     {
       characters: z
         .array(z.string())
