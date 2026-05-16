@@ -152,14 +152,14 @@ export function registerTools(server: McpServer): void {
 
   server.tool(
     "search_memory",
-    "按关键词【定位文件】(只回坐标·不回正文)。scope=all(默认)=索引/角色/设定·精准省上下文·优先用；scope=volumes=兜底搜全部 day 正文(贵·仅当索引和 all 都找不到时才用)。命中后只挑最相关的 1 个文件读全文·禁逐个扫读·禁 bash/uploads(铁律一/二)。回忆旧情节先 grep _每日事件索引.md·别直接说'没有/不记得'。",
+    "按关键词【定位文件】(只回坐标·不回正文)。scope=all(默认)=索引+角色+设定+全部 day 正文一次同搜·一步到位。命中后**必须挑最相关的 1 个文件 read 全文**·索引/摘要只是路牌不是答案·禁逐个扫读·禁 bash/uploads(铁律一/二)。回忆旧情节直接用本工具·别说'没有/不记得'。",
     {
       query: z.string().describe("关键词·长词拆成单词空格分隔(如 '颜料 画笔 写生')"),
       scope: z
         .enum(["all", "index", "characters", "settings", "volumes"])
         .optional()
         .describe(
-          "all=索引/角色/设定(默认·先用)；volumes=搜 day 正文兜底(索引找不到才用)；index/characters/settings=单独范围"
+          "all=索引+角色+设定+day 正文 一次同搜(默认)；volumes=只搜 day 正文；index/characters/settings=单独范围"
         ),
     },
     async ({ query, scope = "all" }) => {
@@ -177,7 +177,7 @@ export function registerTools(server: McpServer): void {
         const setFiles = await tryListDir(SETTINGS_DIR);
         targets.push(...setFiles);
       }
-      if (scope === "volumes") {
+      if (scope === "all" || scope === "volumes") {
         const dayFiles = await listAllDayFiles();
         targets.push(...dayFiles);
       }
@@ -220,25 +220,27 @@ export function registerTools(server: McpServer): void {
         };
       }
 
-      const TOP = 8;
-      const shown = results.slice(0, TOP);
+      const meta = results.filter(
+        (r) => !r.path.startsWith(VOLUMES_PREFIX)
+      );
+      const vol = results.filter((r) =>
+        r.path.startsWith(VOLUMES_PREFIX)
+      );
+      const VOL_TOP = 8;
+      const shown = [...meta, ...vol.slice(0, VOL_TOP)];
       const body = shown
         .map((r) => `## ${r.path}（命中 ${r.score}）\n${r.matches.join("\n")}`)
         .join("\n\n");
-      const hitVolumes = shown.some((r) =>
-        r.path.startsWith(VOLUMES_PREFIX)
-      );
       const footer = [
         "",
         "—————",
-        `⚠️ 以上仅"定位坐标"·不是正文。命中 ${results.length} 个文件${
-          results.length > TOP ? `（只列前 ${TOP} 个·按相关度）` : ""
+        `⚠️ 以上仅"定位坐标"·不是正文。索引/档案命中 ${meta.length} 个、day 正文命中 ${vol.length} 个${
+          vol.length > VOL_TOP ? `（正文只列前 ${VOL_TOP}·按相关度）` : ""
         }。`,
-        "下一步：只挑**最相关的 1 个**用 read_day／read_file 读全文再引用。",
-        "🚫 不要逐个全读——读一串 day 文件会瞬间耗光上下文·是本项目最浪费的错。",
-        hitVolumes
-          ? "🚫 没读全文前一个字不得当史实写（铁律一）。要的不在表里→先 grep _每日事件索引.md 同义词·别用 bash/uploads。"
-          : "🚫 要的不在表里→换同义词重搜或 grep _每日事件索引.md·别用 bash/uploads。",
+        "下一步：挑**最相关的 1 个**用 read_day／read_file 读**全文**再据正文回答。",
+        "❗ 索引/摘要只是路牌·不是答案——具体细节只能从那个文件正文读出来（铁律一）。",
+        "🚫 不要逐个全读——读一串 day 文件会瞬间耗光上下文·本项目最浪费的错。",
+        "🚫 别用 bash/本地 grep/uploads(仓库只在 xcjs-memory)。要的不在表里→拆词/换同义词重搜。",
       ].join("\n");
       return { content: [{ type: "text", text: body + footer }] };
     }
