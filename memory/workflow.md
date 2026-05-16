@@ -189,7 +189,7 @@ xcjs/
 - 涉及住所/通勤/座位 → `memory/settings/地理与住所.md`
 - 涉及家世/阶级 → `memory/settings/世界观.md`
 - 涉及茉莉花/项链/合照/敲门暗号/水彩画 → `memory/settings/重要物品.md`
-- 涉及陶雨治愈幸村 → `memory/settings/治愈记录.md`
+- 涉及陶雨治愈幸村 → `memory/characters/幸村精市.md`（七·治愈记录一节）
 
 ### 步骤 4：⚠️ 回溯历史伏笔（**铁律一适用区**）
 若场景需要"回响"过去（例：First Kiss / 海原祭 / 敲夜谈 / 12.30 第二个三分之一 / GBS 发现），则：
