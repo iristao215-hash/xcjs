@@ -25,17 +25,64 @@ async function findCharacterFile(name: string): Promise<string | null> {
   return null;
 }
 
+function mmddNum(mmdd: string): number {
+  const [a, b] = mmdd.split("-").map(Number);
+  return a * 100 + b;
+}
+
+async function listAllDayFiles(): Promise<string[]> {
+  const out: string[] = [];
+  const entries = await tryListDir(VOLUMES_PREFIX.replace(/\/$/, ""));
+  const volDirs = entries.filter((p) => /\/vol\d+$/.test(p));
+  for (const dir of volDirs) {
+    const files = await tryListDir(dir);
+    out.push(...files.filter((f) => f.endsWith(".md")));
+  }
+  return out;
+}
+
+async function readMany(
+  paths: string[]
+): Promise<Array<{ path: string; content: string }>> {
+  const out: Array<{ path: string; content: string }> = [];
+  const BATCH = 12;
+  for (let i = 0; i < paths.length; i += BATCH) {
+    const chunk = paths.slice(i, i + BATCH);
+    const res = await Promise.all(
+      chunk.map(async (p) => ({ p, c: await tryReadFile(p) }))
+    );
+    for (const r of res) if (r.c) out.push({ path: r.p, content: r.c });
+  }
+  return out;
+}
+
 async function findDayFile(date: string): Promise<string | null> {
   const m = date.match(/(\d{1,2})-(\d{1,2})$/);
   if (!m) return null;
-  const mm = m[1].padStart(2, "0");
-  const dd = m[2].padStart(2, "0");
-  const mmdd = `${mm}-${dd}`;
+  const target = `${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
+  const targetN = mmddNum(target);
 
   for (let v = 1; v <= MAX_VOLS; v++) {
-    const path = `${VOLUMES_PREFIX}vol${v}/${mmdd}.md`;
-    const content = await tryReadFile(path);
-    if (content !== null) return path;
+    const files = await tryListDir(`${VOLUMES_PREFIX}vol${v}`);
+    if (files.length === 0) continue;
+
+    const exact = files.find(
+      (f) => (f.split("/").pop() || "") === `${target}.md`
+    );
+    if (exact) return exact;
+
+    for (const f of files) {
+      const base = f.split("/").pop() || "";
+      // 文件名形如 MM-DD_标题.md 或 MM-DD至MM-DD_标题.md；跨月区间(如 12-30至01-02)不保证命中
+      const rm = base.match(/^(\d{2}-\d{2})(?:至(\d{2}-\d{2}))?/);
+      if (!rm) continue;
+      if (rm[1] === target) return f;
+      if (rm[2]) {
+        const s = mmddNum(rm[1]);
+        const e = mmddNum(rm[2]);
+        if (s <= targetN && targetN <= e) return f;
+      }
+    }
   }
   return null;
 }
@@ -66,7 +113,7 @@ export function registerTools(server: McpServer): void {
 
   server.tool(
     "read_day",
-    "读取某一天的详细剧情文件。输入 YYYY-MM-DD 或 MM-DD·返回 day 文件正文。",
+    "读取某一天的详细剧情文件正文(自动匹配 `MM-DD_标题.md` 与 `MM-DD至MM-DD_…` 合并文件)。输入 YYYY-MM-DD 或 MM-DD。",
     {
       date: z.string().describe("日期格式 YYYY-MM-DD 或 MM-DD·例如 2026-04-20 或 04-20"),
     },
@@ -105,13 +152,13 @@ export function registerTools(server: McpServer): void {
 
   server.tool(
     "search_memory",
-    "按关键词搜索剧情索引·角色档案·设定文件。返回匹配片段及所在文件。不搜索 day 文件正文 (用 read_day 直接读)。",
+    "按关键词搜索剧情：索引·角色档案·设定·以及 day 文件正文(volumes)。默认 all 即包含 day 正文。返回命中片段及所在文件——⚠️ 仅用于定位·必须再用 read_day／read_file 读该文件全文后才能引用·不得据片段摘录(铁律一/二)。回忆旧情节搜不到时·先用本工具搜·不要直接说'没有/不记得'。",
     {
-      query: z.string().describe("搜索关键词·例如 '茉莉' 或 'First Time' 或 '斋藤'"),
+      query: z.string().describe("搜索关键词·例如 '茉莉' 或 '做饭' 或 '斋藤'"),
       scope: z
-        .enum(["all", "index", "characters", "settings"])
+        .enum(["all", "index", "characters", "settings", "volumes"])
         .optional()
-        .describe("搜索范围·默认 all"),
+        .describe("搜索范围·默认 all(含 day 正文)。volumes=只搜 day 正文"),
     },
     async ({ query, scope = "all" }) => {
       const targets: string[] = [];
@@ -128,11 +175,14 @@ export function registerTools(server: McpServer): void {
         const setFiles = await tryListDir(SETTINGS_DIR);
         targets.push(...setFiles);
       }
+      if (scope === "all" || scope === "volumes") {
+        const dayFiles = await listAllDayFiles();
+        targets.push(...dayFiles);
+      }
 
+      const docs = await readMany(targets);
       const results: Array<{ path: string; matches: string[] }> = [];
-      for (const path of targets) {
-        const content = await tryReadFile(path);
-        if (!content) continue;
+      for (const { path, content } of docs) {
         const lines = content.split("\n");
         const matches: string[] = [];
         for (let i = 0; i < lines.length; i++) {
@@ -162,10 +212,16 @@ export function registerTools(server: McpServer): void {
           content: [{ type: "text", text: `未找到关键词 "${query}" 的匹配` }],
         };
       }
+      const hitVolumes = results.some((r) =>
+        r.path.startsWith(VOLUMES_PREFIX)
+      );
+      const guard = hitVolumes
+        ? "⚠️ 命中 volumes/ 仅为定位坐标·必须用 read_day／read_file 读该文件全文后再引用·没读全文前一个字都不得当史实写(铁律一/二)。\n\n"
+        : "";
       const output = results
         .map((r) => `## ${r.path}\n\n${r.matches.join("\n\n— — —\n\n")}`)
         .join("\n\n");
-      return { content: [{ type: "text", text: output }] };
+      return { content: [{ type: "text", text: guard + output }] };
     }
   );
 
