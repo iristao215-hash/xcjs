@@ -180,36 +180,52 @@ export function registerTools(server: McpServer): void {
         targets.push(...dayFiles);
       }
 
+      const terms = query
+        .split(/[\s,，、;；/|]+/)
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0);
+      const needles = terms.length > 0 ? terms : [query];
+
       const docs = await readMany(targets);
-      const results: Array<{ path: string; matches: string[] }> = [];
+      const results: Array<{ path: string; score: number; matches: string[] }> =
+        [];
       for (const { path, content } of docs) {
         const lines = content.split("\n");
         const matches: string[] = [];
+        let score = 0;
         for (let i = 0; i < lines.length; i++) {
-          if (lines[i].includes(query)) {
-            const before = i > 0 ? lines[i - 1] : "";
-            const line = lines[i];
-            const after = i < lines.length - 1 ? lines[i + 1] : "";
-            matches.push(
-              [
-                before && `[${i}] ${before}`,
-                `[${i + 1}] ${line}`,
-                after && `[${i + 2}] ${after}`,
-              ]
-                .filter(Boolean)
-                .join("\n")
-            );
-            if (matches.length >= 5) break;
+          if (needles.some((n) => lines[i].includes(n))) {
+            score++;
+            if (matches.length < 5) {
+              const before = i > 0 ? lines[i - 1] : "";
+              const line = lines[i];
+              const after = i < lines.length - 1 ? lines[i + 1] : "";
+              matches.push(
+                [
+                  before && `[${i}] ${before}`,
+                  `[${i + 1}] ${line}`,
+                  after && `[${i + 2}] ${after}`,
+                ]
+                  .filter(Boolean)
+                  .join("\n")
+              );
+            }
           }
         }
         if (matches.length > 0) {
-          results.push({ path, matches });
+          results.push({ path, score, matches });
         }
       }
+      results.sort((a, b) => b.score - a.score);
 
       if (results.length === 0) {
         return {
-          content: [{ type: "text", text: `未找到关键词 "${query}" 的匹配` }],
+          content: [
+            {
+              type: "text",
+              text: `未找到 "${query}"。改用更短的单个关键词分开重试（例：把「颜料画笔写生」拆成 颜料 画笔 写生 空格分隔搜），并先查 memory/_专名表.md 展开同义词。⚠️ 不要改用 bash／grep／代码执行／uploads——本剧情仓库只存在于 xcjs-memory 连接器·本地沙箱里没有它·回忆历史只能用本工具换关键词重试。`,
+            },
+          ],
         };
       }
       const hitVolumes = results.some((r) =>
