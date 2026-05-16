@@ -152,13 +152,15 @@ export function registerTools(server: McpServer): void {
 
   server.tool(
     "search_memory",
-    "按关键词搜索剧情：索引·角色档案·设定·以及 day 文件正文(volumes)。默认 all 即包含 day 正文。返回命中片段及所在文件——⚠️ 仅用于定位·必须再用 read_day／read_file 读该文件全文后才能引用·不得据片段摘录(铁律一/二)。回忆旧情节搜不到时·先用本工具搜·不要直接说'没有/不记得'。",
+    "按关键词【定位文件】(只回坐标·不回正文)。scope=all(默认)=索引/角色/设定·精准省上下文·优先用；scope=volumes=兜底搜全部 day 正文(贵·仅当索引和 all 都找不到时才用)。命中后只挑最相关的 1 个文件读全文·禁逐个扫读·禁 bash/uploads(铁律一/二)。回忆旧情节先 grep _每日事件索引.md·别直接说'没有/不记得'。",
     {
-      query: z.string().describe("搜索关键词·例如 '茉莉' 或 '做饭' 或 '斋藤'"),
+      query: z.string().describe("关键词·长词拆成单词空格分隔(如 '颜料 画笔 写生')"),
       scope: z
         .enum(["all", "index", "characters", "settings", "volumes"])
         .optional()
-        .describe("搜索范围·默认 all(含 day 正文)。volumes=只搜 day 正文"),
+        .describe(
+          "all=索引/角色/设定(默认·先用)；volumes=搜 day 正文兜底(索引找不到才用)；index/characters/settings=单独范围"
+        ),
     },
     async ({ query, scope = "all" }) => {
       const targets: string[] = [];
@@ -175,7 +177,7 @@ export function registerTools(server: McpServer): void {
         const setFiles = await tryListDir(SETTINGS_DIR);
         targets.push(...setFiles);
       }
-      if (scope === "all" || scope === "volumes") {
+      if (scope === "volumes") {
         const dayFiles = await listAllDayFiles();
         targets.push(...dayFiles);
       }
@@ -196,19 +198,8 @@ export function registerTools(server: McpServer): void {
         for (let i = 0; i < lines.length; i++) {
           if (needles.some((n) => lines[i].includes(n))) {
             score++;
-            if (matches.length < 5) {
-              const before = i > 0 ? lines[i - 1] : "";
-              const line = lines[i];
-              const after = i < lines.length - 1 ? lines[i + 1] : "";
-              matches.push(
-                [
-                  before && `[${i}] ${before}`,
-                  `[${i + 1}] ${line}`,
-                  after && `[${i + 2}] ${after}`,
-                ]
-                  .filter(Boolean)
-                  .join("\n")
-              );
+            if (matches.length < 3) {
+              matches.push(`[${i + 1}] ${lines[i].trim().slice(0, 160)}`);
             }
           }
         }
@@ -223,21 +214,33 @@ export function registerTools(server: McpServer): void {
           content: [
             {
               type: "text",
-              text: `未找到 "${query}"。改用更短的单个关键词分开重试（例：把「颜料画笔写生」拆成 颜料 画笔 写生 空格分隔搜），并先查 memory/_专名表.md 展开同义词。⚠️ 不要改用 bash／grep／代码执行／uploads——本剧情仓库只存在于 xcjs-memory 连接器·本地沙箱里没有它·回忆历史只能用本工具换关键词重试。`,
+              text: `未找到 "${query}"。先 grep memory/_每日事件索引.md（含各种第一次/感情脉络/⭐锚点总表·几乎总能直接点到文件）；再查 memory/_专名表.md 展开同义词、把长词拆成单词空格分隔重搜（scope=volumes）。⚠️ 严禁改用 bash／本地 grep／代码执行／uploads——剧情仓库只在 xcjs-memory·本地沙箱没有它。`,
             },
           ],
         };
       }
-      const hitVolumes = results.some((r) =>
+
+      const TOP = 8;
+      const shown = results.slice(0, TOP);
+      const body = shown
+        .map((r) => `## ${r.path}（命中 ${r.score}）\n${r.matches.join("\n")}`)
+        .join("\n\n");
+      const hitVolumes = shown.some((r) =>
         r.path.startsWith(VOLUMES_PREFIX)
       );
-      const guard = hitVolumes
-        ? "⚠️ 命中 volumes/ 仅为定位坐标·必须用 read_day／read_file 读该文件全文后再引用·没读全文前一个字都不得当史实写(铁律一/二)。\n\n"
-        : "";
-      const output = results
-        .map((r) => `## ${r.path}\n\n${r.matches.join("\n\n— — —\n\n")}`)
-        .join("\n\n");
-      return { content: [{ type: "text", text: guard + output }] };
+      const footer = [
+        "",
+        "—————",
+        `⚠️ 以上仅"定位坐标"·不是正文。命中 ${results.length} 个文件${
+          results.length > TOP ? `（只列前 ${TOP} 个·按相关度）` : ""
+        }。`,
+        "下一步：只挑**最相关的 1 个**用 read_day／read_file 读全文再引用。",
+        "🚫 不要逐个全读——读一串 day 文件会瞬间耗光上下文·是本项目最浪费的错。",
+        hitVolumes
+          ? "🚫 没读全文前一个字不得当史实写（铁律一）。要的不在表里→先 grep _每日事件索引.md 同义词·别用 bash/uploads。"
+          : "🚫 要的不在表里→换同义词重搜或 grep _每日事件索引.md·别用 bash/uploads。",
+      ].join("\n");
+      return { content: [{ type: "text", text: body + footer }] };
     }
   );
 
