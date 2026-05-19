@@ -152,7 +152,7 @@ export function registerTools(server: McpServer): void {
 
   server.tool(
     "search_memory",
-    "按关键词【定位文件】(只回坐标·不回正文)。scope=all(默认)=索引+角色+设定+全部 day 正文一次同搜·一步到位。命中后**必须挑最相关的 1 个文件 read 全文**·索引/摘要只是路牌不是答案·禁逐个扫读·禁 bash/uploads(铁律一/二)。回忆旧情节直接用本工具·别说'没有/不记得'。",
+    "【检索三步流程·第①步：搜索引定位】按关键词搜索·只回坐标不回正文。scope=all(默认)=索引+专名表+角色+设定+全部 day 正文一次同搜。返回后：②从命中确定唯一一篇 day 文件(哪天·哪篇·source_path)·③再 read_day/read_file 读那一篇正文全文才可据正文答。正文命中只给篇目坐标、不给正文内容——未读全文不得写任何正文细节(铁律一)。禁逐个扫读·禁 bash/uploads(铁律二)。回忆旧情节直接用本工具·别说'没有/不记得'。",
     {
       query: z.string().describe("关键词·长词拆成单词空格分隔(如 '颜料 画笔 写生')"),
       scope: z
@@ -227,21 +227,37 @@ export function registerTools(server: McpServer): void {
         r.path.startsWith(VOLUMES_PREFIX)
       );
       const VOL_TOP = 8;
-      const shown = [...meta, ...vol.slice(0, VOL_TOP)];
-      const body = shown
+
+      // 第①步·路牌层：索引/专名表/workflow/角色/设定——这是用来"定位哪天哪篇"的
+      // 路牌，命中行照常给（它本就该被读成地图）。
+      const metaBody = meta
         .map((r) => `## ${r.path}（命中 ${r.score}）\n${r.matches.join("\n")}`)
         .join("\n\n");
+
+      // 第②步·正文定位：volumes 命中**只回坐标(哪篇·命中数)·不回正文片段**——
+      // 逼第③步必须 read_day/read_file 读那一篇全文，禁止拿检索片段当答案。
+      const volList = vol
+        .slice(0, VOL_TOP)
+        .map((r) => `- ${r.path}（命中 ${r.score}）→ read_day／read_file 读全文`)
+        .join("\n");
+      const volBody = vol.length
+        ? `## 命中正文的篇目（仅定位·此处不给正文内容）\n${volList}`
+        : "";
+
       const footer = [
         "",
         "—————",
-        `⚠️ 以上仅"定位坐标"·不是正文。索引/档案命中 ${meta.length} 个、day 正文命中 ${vol.length} 个${
+        "【检索三步流程·不可跳·铁律一/二】",
+        `① 已搜索引/路牌定位：索引·档案命中 ${meta.length} 个、day 正文命中 ${vol.length} 个${
           vol.length > VOL_TOP ? `（正文只列前 ${VOL_TOP}·按相关度）` : ""
         }。`,
-        "下一步：挑**最相关的 1 个**用 read_day／read_file 读**全文**再据正文回答。",
-        "❗ 索引/摘要只是路牌·不是答案——具体细节只能从那个文件正文读出来（铁律一）。",
-        "🚫 不要逐个全读——读一串 day 文件会瞬间耗光上下文·本项目最浪费的错。",
-        "🚫 别用 bash/本地 grep/uploads(仓库只在 xcjs-memory)。要的不在表里→拆词/换同义词重搜。",
+        "② 从上面确定**唯一一篇** day 文件（哪天·哪篇·source_path）——拿不准回 _时间路由索引.md 看节点对（日期｜标题｜source_path｜⭐｜warning）。",
+        "③ 用 read_day／read_file 读那**一篇正文全文**，并在回复里显式声明读了哪篇，才可据正文答。",
+        "❗ 正文命中**没有给你正文内容**（只给了篇目坐标）——未 read 全文前一个正文细节都不许写（铁律一）。索引/档案命中行只是路牌、不是答案。",
+        "🚫 一次最多 read 1–2 篇·别逐个全读·别用 bash/本地 grep/uploads。要的不在→拆词/换同义词重搜。",
       ].join("\n");
+
+      const body = [metaBody, volBody].filter(Boolean).join("\n\n");
       return { content: [{ type: "text", text: body + footer }] };
     }
   );
