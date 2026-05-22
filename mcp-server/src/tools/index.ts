@@ -6,7 +6,7 @@ const MUST_READ = [
   "memory/workflow.md",
   "memory/affinity.md",
   "memory/_专名表.md",
-  "memory/_感情总纲.md",
+  "memory/_每日事件索引.md",
 ];
 
 const CHARACTER_DIR = "memory/characters";
@@ -264,7 +264,7 @@ export function registerTools(server: McpServer): void {
 
   server.tool(
     "make_context_pack",
-    "为本轮场景续写生成上下文包·自动读取必读文件 + 指定角色档案 + 指定 day 文件。每次写新场景的第一步调用此工具。⚠️ 重要：本工具返回的是上下文骨架(必读+档案摘要+感情总纲)·不是完整剧情。涉及具体过往细节(台词·动作·在场·情绪)·必须在调用后用 read_day 读对应 day 文件原文·不得仅凭本工具返回的摘要写作。未找到项必须用 read_file 主动补读。",
+    "为本轮场景续写生成上下文包·自动读取必读文件 + 指定角色档案 + 指定 day 文件。每次写新场景的第一步调用此工具。⚠️ 重要：本工具返回的是上下文骨架(必读+档案摘要+每日事件索引概览)·不是完整剧情。涉及具体过往细节(台词·动作·在场·情绪)·必须在调用后用 read_day 读对应 day 文件原文·不得仅凭本工具返回的摘要写作。未找到项必须用 read_file 主动补读。",
     {
       characters: z
         .array(z.string())
@@ -277,7 +277,7 @@ export function registerTools(server: McpServer): void {
       include_must_read: z
         .boolean()
         .optional()
-        .describe("是否包含必读 (workflow/affinity/专名表/感情总纲)·默认 true"),
+        .describe("是否包含必读 (workflow/affinity/专名表/每日事件索引)·默认 true"),
     },
     async ({ characters = [], dates = [], include_must_read = true }) => {
       const parts: string[] = [];
