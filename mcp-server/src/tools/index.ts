@@ -6,6 +6,7 @@ const MUST_READ = [
   "memory/workflow.md",
   "memory/affinity.md",
   "memory/_每日事件索引.md",
+  "memory/relationships/幸村精市×陶雨.md",
   "memory/settings/世界观.md",
   "memory/settings/重要物品.md",
 ];
@@ -278,7 +279,7 @@ export function registerTools(server: McpServer): void {
       include_must_read: z
         .boolean()
         .optional()
-        .describe("是否包含必读 (workflow/affinity/每日事件索引/世界观/重要物品)·默认 true"),
+        .describe("是否包含必读 (workflow/affinity/每日事件索引/幸村×陶雨关系/世界观/重要物品)·默认 true"),
     },
     async ({ characters = [], dates = [], include_must_read = true }) => {
       const parts: string[] = [];
