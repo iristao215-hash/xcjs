@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f7f2ea" />
+  <title>雨的音乐盒</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <!-- 幸村点歌横幅(iOS 需要用户点一下才能出声) -->
+  <div id="pickBanner" class="pick-banner hidden">
+    <div class="pick-text">
+      <strong id="pickFrom">幸村</strong> 给你点了一首歌
+      <div id="pickSong" class="pick-song"></div>
+      <div id="pickMsg" class="pick-msg"></div>
+    </div>
+    <button id="pickPlayBtn" class="pick-play">▶ 听</button>
+    <button id="pickCloseBtn" class="pick-close" aria-label="关闭">×</button>
+  </div>
+
+  <header class="topbar">
+    <div class="brand">🎐 雨的音乐盒</div>
+    <a id="loginLink" class="login-link" href="./login.html">未登录 →</a>
+  </header>
+
+  <div class="searchbar">
+    <input id="searchInput" type="search" placeholder="搜一首歌听听吧～" autocomplete="off" />
+    <button id="searchBtn" class="search-btn" aria-label="搜索">🔍</button>
+  </div>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="discover">发现</button>
+    <button class="tab" data-tab="playlist">播放列表</button>
+    <button class="tab" data-tab="lyric">歌词</button>
+  </nav>
+
+  <main class="content">
+    <section id="discover" class="panel active">
+      <div id="results" class="results"></div>
+      <div id="discoverEmpty" class="empty">
+        <div class="empty-note">🎵</div>
+        <div>搜点好听的吧</div>
+      </div>
+    </section>
+
+    <section id="playlist" class="panel">
+      <div id="queue" class="queue"></div>
+      <div id="queueEmpty" class="empty">
+        <div class="empty-note">🎵</div>
+        <div>播放列表还是空的</div>
+      </div>
+    </section>
+
+    <section id="lyric" class="panel">
+      <div id="lyricBox" class="lyric-box">
+        <div class="empty">还没有在播放的歌</div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="player" class="player hidden">
+    <img id="pCover" class="p-cover" alt="" />
+    <div class="p-meta">
+      <div id="pName" class="p-name">—</div>
+      <div id="pArtist" class="p-artist">—</div>
+      <div class="p-progress">
+        <span id="pCur">0:00</span>
+        <input id="pSeek" class="p-seek" type="range" min="0" max="1000" value="0" />
+        <span id="pDur">0:00</span>
+      </div>
+    </div>
+    <div class="p-controls">
+      <button id="pPrev" class="ctrl" aria-label="上一首">⏮</button>
+      <button id="pPlay" class="ctrl ctrl-main" aria-label="播放/暂停">▶</button>
+      <button id="pNext" class="ctrl" aria-label="下一首">⏭</button>
+    </div>
+    <audio id="audio"></audio>
+  </footer>
+
+  <script src="./app.js"></script>
+</body>
+</html>

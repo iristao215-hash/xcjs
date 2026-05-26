@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>登录网易云 · 雨的音乐盒</title>
+  <link rel="stylesheet" href="./style.css" />
+  <style>
+    .login-wrap { max-width: 360px; margin: 40px auto; text-align: center; padding: 0 20px; }
+    .qr { width: 220px; height: 220px; margin: 20px auto; border-radius: 16px; background: var(--card); border: 1px solid var(--line); object-fit: contain; }
+    .status { color: var(--ink-soft); font-size: 14px; margin-top: 8px; min-height: 22px; }
+    .tip { color: var(--ink-soft); font-size: 13px; line-height: 1.7; margin-top: 24px; text-align: left; }
+    .refresh { margin-top: 14px; border: 1px solid var(--line); background: var(--card); color: var(--accent-deep); border-radius: 999px; padding: 8px 18px; }
+    a.back { display: inline-block; margin-top: 18px; color: var(--accent-deep); }
+  </style>
+</head>
+<body>
+  <header class="topbar"><div class="brand">🎐 登录网易云</div></header>
+  <div class="login-wrap">
+    <p>用<strong>手机网易云音乐 App</strong> 扫下面的码<br/>（用你的 VIP 账号，扫完才能听整首）</p>
+    <img id="qr" class="qr" alt="二维码" />
+    <div id="status" class="status">正在生成二维码…</div>
+    <button id="refresh" class="refresh">刷新二维码</button>
+    <div class="tip">
+      为什么扫码不用验证码？因为 VPS 是机房 IP，验证码登录会被网易云风控拦；扫码走的是你手机的网络，安全。<br/>
+      扫码成功后登录态保存在服务器，大概半年有效，过期了回来重新扫一次就行。
+    </div>
+    <a class="back" href="./">← 回音乐盒</a>
+  </div>
+
+  <script>
+    let key = "";
+    let timer = null;
+    const $ = (id) => document.getElementById(id);
+
+    async function start() {
+      $("status").textContent = "正在生成二维码…";
+      try {
+        const r = await fetch("/api/login/qr").then((x) => x.json());
+        key = r.key;
+        $("qr").src = r.qrimg;
+        $("status").textContent = "等待扫码…";
+        poll();
+      } catch {
+        $("status").textContent = "生成失败，点刷新重试";
+      }
+    }
+    function poll() {
+      clearInterval(timer);
+      timer = setInterval(check, 2000);
+    }
+    async function check() {
+      if (!key) return;
+      try {
+        const r = await fetch(`/api/login/check?key=${encodeURIComponent(key)}`).then((x) => x.json());
+        if (r.code === 800) { $("status").textContent = "二维码已过期，点刷新"; clearInterval(timer); }
+        else if (r.code === 801) { $("status").textContent = "等待扫码…"; }
+        else if (r.code === 802) { $("status").textContent = "已扫码，请在手机上确认"; }
+        else if (r.code === 803) {
+          $("status").textContent = "✅ 登录成功！正在跳转…";
+          clearInterval(timer);
+          setTimeout(() => (location.href = "./"), 1200);
+        }
+      } catch {}
+    }
+    $("refresh").addEventListener("click", start);
+    start();
+  </script>
+</body>
+</html>
